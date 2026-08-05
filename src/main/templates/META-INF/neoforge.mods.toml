@@ -1,0 +1,54 @@
+
+license="${mod_license}"
+
+#issueTrackerURL="https://change.me.to.your.issue.tracker.example.invalid/" #optional
+
+[[mods]] #mandatory
+
+modId="${mod_id}" #mandatory
+
+version="${mod_version}" #mandatory
+
+displayName="${mod_name}" #mandatory
+
+#updateJSONURL="https://change.me.example.invalid/updates.json" #optional
+
+#displayURL="https://change.me.to.your.mods.homepage.example.invalid/" #optional
+
+logoFile="${mod_id}.png"
+
+#credits="" #optional
+
+authors="niix-dan"
+
+description='''
+Dynamic HUD hides and reveals vanilla HUD elements based on player activity.
+
+Instead of a static overlay always on screen, elements like the hotbar, health, food, armor, and experience bar fade out during idle moments and slide back in when you interact, take damage, enter combat, or open the inventory.
+Every trigger and every affected element can be toggled independently through the config file, and the animation timing can be adjusted to match your preferred pace.
+'''
+
+[[mixins]]
+config="${mod_id}.mixins.json"
+
+#[[accessTransformers]]
+#file="META-INF/accesstransformer.cfg"
+
+# The coremods config file path is not configurable and is always loaded from META-INF/coremods.json
+
+[[dependencies.${mod_id}]] #optional
+    modId="neoforge" #mandatory
+    type="required" #mandatory
+    versionRange="[${neo_version},)" #mandatory
+    ordering="NONE"
+    side="BOTH"
+
+[[dependencies.${mod_id}]]
+    modId="minecraft"
+    type="required"
+    versionRange="${minecraft_version_range}"
+    ordering="NONE"
+    side="BOTH"
+
+#[features.${mod_id}]
+#openGLVersion="[3.2,)"

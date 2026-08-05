@@ -1,0 +1,27 @@
+{
+  "dynhud.configuration.settings_animation": "Animation Settings",
+  "dynhud.configuration.slideInSpeed": "Slide In Speed",
+  "dynhud.configuration.slideOutSpeed": "Slide Out Speed",
+  "dynhud.configuration.hideDelayTicks": "Hide Delay (Ticks)",
+  "dynhud.configuration.slideOffset": "Slide Offset (Pixels)",
+
+  "dynhud.configuration.settings_triggers": "Trigger Settings",
+  "dynhud.configuration.triggerOnItemChange": "Trigger on Item Change",
+  "dynhud.configuration.triggerOnItemUse": "Trigger on Item Use",
+  "dynhud.configuration.triggerOnCombat": "Trigger on Combat",
+  "dynhud.configuration.triggerOnDamage": "Trigger on Damage",
+  "dynhud.configuration.triggerWhenNotFullHealth": "Trigger When Not Full Health",
+  "dynhud.configuration.triggerOnSneak": "Trigger on Sneak",
+  "dynhud.configuration.triggerOnScreenOpen": "Trigger on Screen Open",
+
+  "dynhud.configuration.settings_elements": "Affected Elements",
+  "dynhud.configuration.affectHotbar": "Affect Hotbar",
+  "dynhud.configuration.affectHealth": "Affect Health Bar",
+  "dynhud.configuration.affectFood": "Affect Food Bar",
+  "dynhud.configuration.affectArmor": "Affect Armor Bar",
+  "dynhud.configuration.affectAir": "Affect Air Bar",
+  "dynhud.configuration.affectInfoBarBackground": "Affect Info Bar Background",
+  "dynhud.configuration.affectInfoBar": "Affect Info Bar / Experience",
+  "dynhud.configuration.affectXpLevel": "Affect Experience Level",
+  "dynhud.configuration.affectVehicleHealth": "Affect Vehicle Health"
+}
