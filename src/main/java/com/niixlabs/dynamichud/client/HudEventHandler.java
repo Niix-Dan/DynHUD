@@ -11,14 +11,32 @@ import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.client.event.RenderGuiLayerEvent;
-import net.neoforged.neoforge.client.gui.VanillaGuiLayers;
+import net.neoforged.neoforge.common.ModConfigSpec;
+
+import java.util.EnumMap;
+import java.util.HashMap;
+import java.util.Map;
 
 @EventBusSubscriber(modid = DynHUD.MODID, value = Dist.CLIENT)
 public class HudEventHandler {
-    private static int inactivityTicks = 0;
+
+    private static final class ElementState {
+        float progress = 1.0f;
+        int inactivityTicks = 0;
+    }
+
+    private static final Map<HudElement, ElementState> STATES = new EnumMap<>(HudElement.class);
+    private static final Map<Identifier, HudElement> LAYER_LOOKUP = new HashMap<>();
+
+    static {
+        for (HudElement element : HudElement.values()) {
+            STATES.put(element, new ElementState());
+            LAYER_LOOKUP.put(element.layerId, element);
+        }
+    }
+
     private static int lastSlot = -1;
     private static float lastHealth = -1;
-    private static float currentProgress = 1.0f;
 
     @SubscribeEvent
     public static void onClientTick(ClientTickEvent.Post event) {
@@ -27,96 +45,79 @@ public class HudEventHandler {
 
         if (player == null) return;
 
-        boolean interacted = false;
+        Map<HudTrigger, Boolean> fired = new EnumMap<>(HudTrigger.class);
 
-        if (DynHUDConfig.TRIGGER_ITEM_CHANGE.get()) {
-            if (player.getInventory().getSelectedSlot() != lastSlot) {
-                lastSlot = player.getInventory().getSelectedSlot();
-                interacted = true;
-            }
-        } else {
-            lastSlot = player.getInventory().getSelectedSlot();
-        }
+        boolean itemChanged = player.getInventory().getSelectedSlot() != lastSlot;
+        lastSlot = player.getInventory().getSelectedSlot();
+        fired.put(HudTrigger.ITEM_CHANGE, itemChanged);
 
-        if (DynHUDConfig.TRIGGER_DAMAGE.get() && player.getHealth() < lastHealth) {
-            interacted = true;
-        }
+        boolean damaged = player.getHealth() < lastHealth;
         lastHealth = player.getHealth();
+        fired.put(HudTrigger.DAMAGE, damaged);
 
-        if (DynHUDConfig.TRIGGER_NOT_FULL_HEALTH.get() && player.getHealth() < player.getMaxHealth()) {
-            interacted = true;
-        }
+        fired.put(HudTrigger.NOT_FULL_HEALTH, player.getHealth() < player.getMaxHealth());
+        fired.put(HudTrigger.COMBAT, player.swingTime > 0 || player.hurtTime > 0);
+        fired.put(HudTrigger.ITEM_USE, player.isUsingItem());
+        fired.put(HudTrigger.SNEAK, mc.options.keyShift.isDown());
+        fired.put(HudTrigger.SCREEN, mc.screen != null);
 
-        if (DynHUDConfig.TRIGGER_COMBAT.get() && (player.swingTime > 0 || player.hurtTime > 0)) {
-            interacted = true;
-        }
+        for (HudElement element : HudElement.values()) {
+            ElementState state = STATES.get(element);
+            Map<HudTrigger, ModConfigSpec.BooleanValue> triggerConfig = DynHUDConfig.TRIGGERS.get(element);
 
-        if (DynHUDConfig.TRIGGER_ITEM_USE.get() && player.isUsingItem()) {
-            interacted = true;
-        }
+            boolean interacted = false;
+            for (HudTrigger trigger : HudTrigger.values()) {
+                if (triggerConfig.get(trigger).get() && Boolean.TRUE.equals(fired.get(trigger))) {
+                    interacted = true;
+                    break;
+                }
+            }
 
-        if (DynHUDConfig.TRIGGER_SNEAK.get() && mc.options.keyShift.isDown()) {
-            interacted = true;
-        }
+            if (interacted) {
+                state.inactivityTicks = 0;
+            } else {
+                state.inactivityTicks++;
+            }
 
-        if (DynHUDConfig.TRIGGER_SCREEN.get() && mc.screen != null) {
-            interacted = true;
-        }
+            int hideDelay = DynHUDConfig.HIDE_DELAY.get(element).get();
 
-        if (interacted) {
-            inactivityTicks = 0;
-        } else {
-            inactivityTicks++;
-        }
-
-        if (inactivityTicks > DynHUDConfig.HIDE_DELAY.get()) {
-            float outSpeed = DynHUDConfig.SLIDE_OUT_SPEED.get().floatValue();
-            currentProgress = Math.max(0.0f, currentProgress - outSpeed);
-        } else {
-            float inSpeed = DynHUDConfig.SLIDE_IN_SPEED.get().floatValue();
-            currentProgress = Math.min(1.0f, currentProgress + inSpeed);
+            if (state.inactivityTicks > hideDelay) {
+                float outSpeed = DynHUDConfig.SLIDE_OUT_SPEED.get(element).get().floatValue();
+                state.progress = Math.max(0.0f, state.progress - outSpeed);
+            } else {
+                float inSpeed = DynHUDConfig.SLIDE_IN_SPEED.get(element).get().floatValue();
+                state.progress = Math.min(1.0f, state.progress + inSpeed);
+            }
         }
     }
 
     @SubscribeEvent
     public static void onPreRenderLayer(RenderGuiLayerEvent.Pre event) {
-        Identifier layer = event.getName();
+        HudElement element = LAYER_LOOKUP.get(event.getName());
+        if (element == null || !DynHUDConfig.ENABLED.get(element).get()) return;
 
-        if (isDynamicLayer(layer)) {
-            if (currentProgress <= 0.0f) {
-                event.setCanceled(true);
-            } else if (currentProgress < 1.0f) {
-                float offsetMax = DynHUDConfig.SLIDE_OFFSET.get().floatValue();
-                float currentOffset = Mth.lerp(currentProgress, offsetMax, 0.0f);
+        ElementState state = STATES.get(element);
 
-                event.getGuiGraphics().pose().pushMatrix();
-                event.getGuiGraphics().pose().translate(0, currentOffset);
-            }
+        if (state.progress <= 0.0f) {
+            event.setCanceled(true);
+        } else if (state.progress < 1.0f) {
+            float offsetMax = DynHUDConfig.SLIDE_OFFSET.get(element).get().floatValue();
+            float currentOffset = Mth.lerp(state.progress, offsetMax, 0.0f);
+
+            event.getGuiGraphics().pose().pushMatrix();
+            event.getGuiGraphics().pose().translate(0, currentOffset);
         }
     }
 
     @SubscribeEvent
     public static void onPostRenderLayer(RenderGuiLayerEvent.Post event) {
-        Identifier layer = event.getName();
+        HudElement element = LAYER_LOOKUP.get(event.getName());
+        if (element == null || !DynHUDConfig.ENABLED.get(element).get()) return;
 
-        if (isDynamicLayer(layer)) {
-            if (currentProgress < 1.0f && currentProgress > 0.0f) {
-                event.getGuiGraphics().pose().popMatrix();
-            }
+        ElementState state = STATES.get(element);
+
+        if (state.progress < 1.0f && state.progress > 0.0f) {
+            event.getGuiGraphics().pose().popMatrix();
         }
-    }
-
-    private static boolean isDynamicLayer(Identifier layer) {
-        if (layer.equals(VanillaGuiLayers.HOTBAR)) return DynHUDConfig.AFFECT_HOTBAR.get();
-        if (layer.equals(VanillaGuiLayers.PLAYER_HEALTH)) return DynHUDConfig.AFFECT_HEALTH.get();
-        if (layer.equals(VanillaGuiLayers.FOOD_LEVEL)) return DynHUDConfig.AFFECT_FOOD.get();
-        if (layer.equals(VanillaGuiLayers.ARMOR_LEVEL)) return DynHUDConfig.AFFECT_ARMOR.get();
-        if (layer.equals(VanillaGuiLayers.AIR_LEVEL)) return DynHUDConfig.AFFECT_AIR.get();
-        if (layer.equals(VanillaGuiLayers.CONTEXTUAL_INFO_BAR_BACKGROUND)) return DynHUDConfig.AFFECT_INFO_BAR_BG.get();
-        if (layer.equals(VanillaGuiLayers.CONTEXTUAL_INFO_BAR)) return DynHUDConfig.AFFECT_INFO_BAR.get();
-        if (layer.equals(VanillaGuiLayers.EXPERIENCE_LEVEL)) return DynHUDConfig.AFFECT_XP_LEVEL.get();
-        if (layer.equals(VanillaGuiLayers.VEHICLE_HEALTH)) return DynHUDConfig.AFFECT_VEHICLE_HEALTH.get();
-
-        return false;
     }
 }
